@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Västtrafik – Enkel tavla</title>
+<style>
+  body {
+    background: #000;
+    color: #fff;
+    font-family: sans-serif;
+    padding: 16px;
+  }
+  h1 {
+    margin-bottom: 10px;
+    font-size: 28px;
+  }
+  .row {
+    padding: 8px 0;
+    border-bottom: 1px solid #333;
+    font-size: 20px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .row span {
+    display: inline-block;
+  }
+  .line { width: 60px; font-weight: bold; }
+  .dest { flex: 1; margin-left: 10px; }
+  .time { width: 80px; text-align: right; }
+  .updated {
+    margin-top: 12px;
+    color: #888;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<h1 id="title">Avgångar</h1>
+<div id="list">Laddar…</div>
+<div class="updated" id="updated"></div>
+
+<script>
+function getStationId() {
+  var params = new URLSearchParams(window.location.search);
+  var s = params.get("station");
+  return s ? s : "9021014006670000"; // default: Stenkolsgatan
+}
+
+function getApiUrl(stationId) {
+  return "https://www.vasttrafik.se/avgangar/_next/data/production/environments/prod/stations/" +
+         stationId + ".json";
+}
+
+async function load() {
+  var stationId = getStationId();
+  var url = getApiUrl(stationId);
+
+  try {
+    var response = await fetch(url);
+    var data = await response.json();
+
+    var results = data.pageProps.paginationResult.results;
+    var stationName = data.pageProps.station.name || "Avgångar";
+    document.getElementById("title").innerText = stationName;
+
+    var html = "";
+    for (var i = 0; i < results.length && i < 20; i++) {
+      var d = results[i];
+      var line = d.line && d.line.name ? d.line.name : "?";
+      var dest = d.destination && d.destination.name ? d.destination.name : "?";
+      var timeText = (d.countdown && d.countdown.text) ?
+                     d.countdown.text :
+                     (d.plannedTime && d.plannedTime.time ? d.plannedTime.time : "");
+
+      html += '<div class="row">' +
+                '<span class="line">' + line + '</span>' +
+                '<span class="dest">' + dest + '</span>' +
+                '<span class="time">' + timeText + '</span>' +
+              '</div>';
+    }
+
+    if (!html) {
+      html = "<p>Inga avgångar kunde hämtas.</p>";
+    }
+
+    document.getElementById("list").innerHTML = html;
+    document.getElementById("updated").innerText =
+      "Uppdaterad " + new Date().toLocaleTimeString("sv-SE");
+  } catch (e) {
+    document.getElementById("list").innerHTML =
+      "<p>Kunde inte hämta data från Västtrafik.</p>";
+    console.log(e);
+  }
+}
+
+load();
+setInterval(load, 30000);
+</script>
+
+</body>
+</html>
