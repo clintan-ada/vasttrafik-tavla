@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Västtrafik – Tabelltavla</title>
+<style>
+  body {
+    margin: 0;
+    background: #020308;
+    color: #fff;
+    font-family: sans-serif;
+  }
+  .wrapper {
+    padding: 24px 32px;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .title {
+    font-size: 34px;
+    font-weight: 700;
+  }
+  .clock {
+    font-size: 24px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 20px;
+  }
+  th, td {
+    padding: 10px 6px;
+  }
+  th {
+    border-bottom: 2px solid #444;
+    color: #aaa;
+    font-size: 16px;
+    font-weight: 400;
+  }
+  tr:nth-child(even) td {
+    background: rgba(255,255,255,0.05);
+  }
+  .pill {
+    background: #fdd835;
+    color: #000;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-weight: bold;
+    min-width: 42px;
+    text-align: center;
+    display: inline-block;
+  }
+  .time { text-align: right; font-variant-numeric: tabular-nums; }
+  .track { text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="header">
+    <div class="title" id="title">Avgångar</div>
+    <div class="clock" id="clock"></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Linje</th><th>Mot</th><th>Läge</th><th>Avgår</th>
+      </tr>
+    </thead>
+    <tbody id="body">
+      <tr><td colspan="4">Laddar…</td></tr>
+    </tbody>
+  </table>
+
+</div>
+
+<script>
+function tickClock() {
+  document.getElementById("clock").innerText =
+    new Date().toLocaleTimeString("sv-SE", {hour:"2-digit", minute:"2-digit"});
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+function getStationId() {
+  var params = new URLSearchParams(window.location.search);
+  var s = params.get("station");
+  return s ? s : "9021014006670000"; // default Stenkolsgatan
+}
+
+function getApiUrl(stationId) {
+  return "https://www.vasttrafik.se/avgangar/_next/data/production/environments/prod/stations/" +
+         stationId + ".json";
+}
+
+async function load() {
+  var stationId = getStationId();
+  var url = getApiUrl(stationId);
+
+  try {
+    var response = await fetch(url);
+    var data = await response.json();
+    var results = data.pageProps.paginationResult.results;
+    var stationName = data.pageProps.station.name || "Avgångar";
+    document.getElementById("title").innerText = stationName;
+
+    var html = "";
+    for (var i = 0; i < results.length && i < 20; i++) {
+      var d = results[i];
+      var line = d.line && d.line.name ? d.line.name : "?";
+      var dest = d.destination && d.destination.name ? d.destination.name : "?";
+      var timeText = (d.countdown && d.countdown.text) ?
+                     d.countdown.text :
+                     (d.plannedTime && d.plannedTime.time ? d.plannedTime.time : "");
+      var track = d.track ? d.track :
+                  (d.stopPoint && d.stopPoint.platform ? d.stopPoint.platform : "");
+
+      html += "<tr>" +
+              "<td><div class=\"pill\">" + line + "</div></td>" +
+              "<td>" + dest + "</td>" +
+              "<td class=\"track\">" + track + "</td>" +
+              "<td class=\"time\">" + timeText + "</td>" +
+              "</tr>";
+    }
+
+    if (!html) {
+      html = "<tr><td colspan='4'>Inga avgångar kunde hämtas.</td></tr>";
+    }
+
+    document.getElementById("body").innerHTML = html;
+  } catch (e) {
+    document.getElementById("body").innerHTML =
+      "<tr><td colspan='4'>Kunde inte hämta data från Västtrafik.</td></tr>";
+    console.log(e);
+  }
+}
+
+load();
+setInterval(load, 30000);
+</script>
+
+</body>
+</html>
